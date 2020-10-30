@@ -65,7 +65,7 @@ class Mailbox0(Message):
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
         address = address.lower()
 
-        if not address.endswith("@example.com"):
+        if not address.endswith("@mb0.wtte.ch"):
             return "550 not relaying to that domain"
 
         envelope.rcpt_tos.append(address)
