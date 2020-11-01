@@ -1,19 +1,60 @@
 import asyncio
+import email
+import email.policy
 import hashlib
 import json
 import logging
 import mailbox
 import os
+import random
+import time
+
+from email.message import EmailMessage
+from email.utils import parsedate_to_datetime
 
 from functools import partial
 
 import tornado
 import tornado.options
-from tornado.web import RequestHandler, HTTPError
+from tornado.ioloop import IOLoop
 from tornado.log import app_log
+from tornado.web import RequestHandler, HTTPError
 
 from aiosmtpd.smtp import SMTP as SMTPServer
-from aiosmtpd.handlers import Debugging, Message, COMMASPACE
+from aiosmtpd.handlers import Message, COMMASPACE
+
+
+CONFIG = {"base_dir": "/tmp/mb0", "gc_interval": 180}
+# configuration per domain for which we will accept emails
+DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
+
+
+def remove_old_email(domain, max_age):
+    """Remove old emails for a given domain"""
+    app_log.info(f"Checking {domain} for old email")
+    try:
+        base_maildir = CONFIG["base_dir"]
+        maildir = os.path.join(base_maildir, domain)
+
+        now = time.time()
+
+        for entry in os.listdir(maildir):
+            mbox = mailbox.Maildir(os.path.join(maildir, entry))
+
+            for msg_id in mbox.keys():
+                ts, _ = msg_id.split(".", maxsplit=1)
+                ts = int(ts)
+                if now - max_age > ts:
+                    mbox.discard(msg_id)
+
+    finally:
+        jitter = 0.3 * (0.5 - random.random())
+        IOLoop.current().call_later(
+            (1 + jitter) * DOMAINS[domain].get("gc_interval", CONFIG["gc_interval"]),
+            remove_old_email,
+            domain,
+            max_age,
+        )
 
 
 class BaseAPIHandler(RequestHandler):
@@ -42,10 +83,103 @@ class PingHandler(BaseAPIHandler):
         self.finish("pong")
 
 
+class MailBoxHandler(BaseAPIHandler):
+    def initialize(self, base_maildir):
+        self.base_maildir = base_maildir
+
+    async def get(self, address):
+        mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
+
+        if not os.path.exists(mail_dir):
+            self.write({"emails": []})
+            return
+
+        mbox = mailbox.Maildir(mail_dir)
+        self.write({"emails": sorted(mbox.keys())})
+
+
+class EMailHandler(BaseAPIHandler):
+    def initialize(self, base_maildir):
+        self.base_maildir = base_maildir
+
+    async def get(self, address, message_id):
+        mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
+
+        if not os.path.exists(mail_dir):
+            self.set_status(404)
+            self.write({"message": "This mailbox doesn't exist."})
+            return
+
+        mbox = mailbox.Maildir(mail_dir)
+        if message_id not in mbox:
+            self.set_status(404)
+            self.write({"message": "This email doesn't exist."})
+            return
+
+        mdir_msg = mbox.get_message(message_id)
+        message = email.message_from_bytes(
+            mdir_msg.as_bytes(), _class=EmailMessage, policy=email.policy.default
+        )
+
+        richest = message.get_body()
+        if richest["content-type"].maintype == "text":
+            if richest["content-type"].subtype == "plain":
+                richest_body = {
+                    "content": "\n".join(
+                        line for line in richest.get_content().splitlines()
+                    ),
+                    "content-type": richest.get_content_type(),
+                }
+
+            elif richest["content-type"].subtype == "html":
+                richest_body = {
+                    "content": richest.get_content(),
+                    "content-type": richest.get_content_type(),
+                }
+        elif richest["content-type"].content_type == "multipart/related":
+            richest_body = {
+                "content": richest.get_body(preferencelist=("html",)).get_content(),
+                "content-type": "text/html",
+            }
+        else:
+            richest_body = {
+                "content": "Don't know how to display {}".format(
+                    richest.get_content_type()
+                ),
+                "content-type": "text/plain",
+            }
+
+        simplest = message.get_body(preferencelist=("plain", "html"))
+        simplest_body = {
+            "content": "".join(simplest.get_content().splitlines(keepends=True)),
+            "content-type": simplest.get_content_type(),
+        }
+
+        date = parsedate_to_datetime(message["date"])
+        if date.tzinfo is None:
+            date = date.isoformat() + "+00:00"
+        else:
+            date = date.isoformat()
+
+        self.write(
+            {
+                "richestBody": richest_body,
+                "simplestBody": simplest_body,
+                "subject": message["subject"],
+                "date": date,
+                "from": message["from"],
+                "x-mailfrom": message["x-mailfrom"],
+            }
+        )
+
+
 class Application(tornado.web.Application):
-    def __init__(self):
+    def __init__(self, base_maildir):
+        options = {"base_maildir": base_maildir}
         handlers = [
             (r"/api", PingHandler),
+            (r"/api/([^/]+)", MailBoxHandler, options),
+            (r"/api/([^/]+)/([^/]+)", EMailHandler, options),
         ]
 
         settings = dict(debug=True)
@@ -65,7 +199,7 @@ class Mailbox0(Message):
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
         address = address.lower()
 
-        if not address.endswith("@mb0.wtte.ch"):
+        if not any(address.endswith(f"@{domain}") for domain in DOMAINS.keys()):
             return "550 not relaying to that domain"
 
         envelope.rcpt_tos.append(address)
@@ -73,16 +207,25 @@ class Mailbox0(Message):
 
     def handle_message(self, message):
         for recipient in message["X-RcptTo"].split(COMMASPACE):
-            mail_dir = os.path.join(self.base_maildir, adddress_to_path(recipient))
+            local, _, domain = recipient.partition("@")
+            mail_dir = os.path.join(
+                self.base_maildir, domain, adddress_to_path(recipient)
+            )
             mbox = mailbox.Maildir(mail_dir)
             mbox.add(message)
 
 
 def main():
-    os.makedirs("/tmp/mb0", exist_ok=True)
+    base_maildir = CONFIG["base_dir"]
+
+    # Setup mailbox directories for all the domains we handle
+    for domain in DOMAINS:
+        os.makedirs(os.path.join(base_maildir, domain), exist_ok=True)
+
     tornado.options.parse_command_line()
     logging.getLogger().setLevel(logging.DEBUG)
-    http_server = tornado.httpserver.HTTPServer(Application())
+
+    http_server = tornado.httpserver.HTTPServer(Application(base_maildir))
     http_server.listen(8880)
 
     loop = asyncio.get_event_loop()
@@ -90,17 +233,24 @@ def main():
     coro = loop.create_server(
         partial(
             SMTPServer,
-            Mailbox0("/tmp/mb0"),
+            Mailbox0(base_maildir),
             enable_SMTPUTF8=True,
-            hostname="mb0.wtte.ch",
+            hostname="mail.mb0.wtte.ch",
         ),
         "0.0.0.0",
         25,
     )
     server = loop.run_until_complete(coro)
 
+    for domain, config in DOMAINS.items():
+        IOLoop.current().call_later(
+            config.get("gc_interval", CONFIG["gc_interval"]),
+            remove_old_email,
+            domain,
+            config["max_email_age"],
+        )
+
     loop.run_forever()
-    # tornado.ioloop.IOLoop.instance().start()
 
 
 if __name__ == "__main__":
