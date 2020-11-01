@@ -34,7 +34,8 @@ def remove_old_email(domain, max_age):
     app_log.info(f"Checking {domain} for old email")
     try:
         base_maildir = CONFIG["base_dir"]
-        maildir = os.path.join(base_maildir, domain)
+        maildir = os.path.join(base_maildir, domain_to_path(domain))
+        app_log.debug(f"Checking {maildir}...")
 
         now = time.time()
 
@@ -186,9 +187,17 @@ class Application(tornado.web.Application):
         tornado.web.Application.__init__(self, handlers, **settings)
 
 
+def domain_to_path(domain):
+    return hashlib.sha1(domain.lower().strip().encode()).hexdigest()
+
+
 def adddress_to_path(address):
-    # XXX maybe remove the "plus" part of the address?
-    return hashlib.sha1(address.lower().strip().encode()).hexdigest()
+    # XXX maybe remove the "plus" part of the local address?
+    local, _, domain = address.partition("@")
+    return os.path.join(
+        domain_to_path(domain),
+        hashlib.sha1(address.lower().strip().encode()).hexdigest(),
+    )
 
 
 class Mailbox0(Message):
@@ -207,10 +216,7 @@ class Mailbox0(Message):
 
     def handle_message(self, message):
         for recipient in message["X-RcptTo"].split(COMMASPACE):
-            local, _, domain = recipient.partition("@")
-            mail_dir = os.path.join(
-                self.base_maildir, domain, adddress_to_path(recipient)
-            )
+            mail_dir = os.path.join(self.base_maildir, adddress_to_path(recipient))
             mbox = mailbox.Maildir(mail_dir)
             mbox.add(message)
 
@@ -220,7 +226,7 @@ def main():
 
     # Setup mailbox directories for all the domains we handle
     for domain in DOMAINS:
-        os.makedirs(os.path.join(base_maildir, domain), exist_ok=True)
+        os.makedirs(os.path.join(base_maildir, domain_to_path(domain)), exist_ok=True)
 
     tornado.options.parse_command_line()
     logging.getLogger().setLevel(logging.DEBUG)
