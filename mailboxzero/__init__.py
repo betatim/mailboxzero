@@ -203,7 +203,7 @@ class EMailHandler(BaseAPIHandler):
                 "date": date,
                 "from": message["from"],
                 "x-mailfrom": message["x-mailfrom"],
-                "headers": [f"{k}: {v}" for k, v in message.items()],
+                "headers": [(k, v) for k, v in message.items()],
             }
         )
 
