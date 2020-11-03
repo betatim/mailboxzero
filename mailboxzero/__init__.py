@@ -24,7 +24,7 @@ from tornado.log import app_log
 from tornado.web import RequestHandler, HTTPError
 
 from aiosmtpd.smtp import SMTP as SMTPServer
-from aiosmtpd.handlers import Message, COMMASPACE
+from aiosmtpd.handlers import COMMASPACE
 
 
 def domain_to_path(domain):
@@ -229,7 +229,41 @@ def replace_large_parts(message, limit=1024 * 1024):
                 )
 
 
-class SMTPMailboxHandler(Message):
+# Our own copy of aiosmtpd.handlers.Message so we can set the policy
+class _Message:
+    def __init__(self, message_class=None):
+        self.message_class = EmailMessage
+
+    async def handle_DATA(self, server, session, envelope):
+        envelope = self.prepare_message(session, envelope)
+        self.handle_message(envelope)
+        return "250 OK"
+
+    def prepare_message(self, session, envelope):
+        # If the server was created with decode_data True, then data will be a
+        # str, otherwise it will be bytes.
+        data = envelope.content
+        if isinstance(data, bytes):
+            message = email.message_from_bytes(
+                data, self.message_class, policy=email.policy.default
+            )
+        else:
+            assert isinstance(data, str), "Expected str or bytes, got {}".format(
+                type(data)
+            )
+            message = email.message_from_string(
+                data, self.message_class, policy=email.policy.default
+            )
+        message["X-Peer"] = str(session.peer)
+        message["X-MailFrom"] = envelope.mail_from
+        message["X-RcptTo"] = COMMASPACE.join(envelope.rcpt_tos)
+        return message
+
+    def handle_message(self, message):
+        raise NotImplementedError
+
+
+class SMTPMailboxHandler(_Message):
     def __init__(self, base_maildir, domains, message_class=None):
         self.base_maildir = base_maildir
         self.domains = domains
@@ -285,7 +319,7 @@ def start_all(
     coro = loop.create_server(
         partial(
             SMTPServer,
-            SMTPMailboxHandler(base_maildir, domains),
+            SMTPMailboxHandler(base_maildir, domains, message_class=EmailMessage),
             enable_SMTPUTF8=True,
             hostname="mail.mb0.wtte.ch",
         ),
