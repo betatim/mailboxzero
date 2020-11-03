@@ -65,6 +65,8 @@ def remove_old_email(domain, max_age, base_maildir, gc_interval):
             remove_old_email,
             domain,
             max_age,
+            base_maildir,
+            gc_interval,
         )
 
 
