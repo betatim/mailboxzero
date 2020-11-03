@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import email
 import email.policy
@@ -14,6 +15,8 @@ from email.utils import parsedate_to_datetime
 
 from functools import partial
 
+from textwrap import dedent
+
 import tornado
 import tornado.options
 from tornado.ioloop import IOLoop
@@ -24,18 +27,25 @@ from aiosmtpd.smtp import SMTP as SMTPServer
 from aiosmtpd.handlers import Message, COMMASPACE
 
 
-CONFIG = {"base_dir": "/tmp/mb0", "gc_interval": 180}
-# configuration per domain for which we will accept emails
-DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
+def domain_to_path(domain):
+    return hashlib.sha1(domain.lower().strip().encode()).hexdigest()
 
 
-def remove_old_email(domain, max_age):
+def adddress_to_path(address):
+    # XXX maybe remove the "plus" part of the local address?
+    local, _, domain = address.partition("@")
+    return os.path.join(
+        domain_to_path(domain),
+        hashlib.sha1(address.lower().strip().encode()).hexdigest(),
+    )
+
+
+def remove_old_email(domain, max_age, base_maildir, gc_interval):
     """Remove old emails for a given domain"""
-    app_log.info(f"Checking {domain} for old email")
+    app_log.info(f"Cleaning up old email for {domain}")
     try:
-        base_maildir = CONFIG["base_dir"]
         maildir = os.path.join(base_maildir, domain_to_path(domain))
-        app_log.debug(f"Checking {maildir}...")
+        app_log.debug(f"Checking {maildir} ...")
 
         now = time.time()
 
@@ -51,7 +61,7 @@ def remove_old_email(domain, max_age):
     finally:
         jitter = 0.3 * (0.5 - random.random())
         IOLoop.current().call_later(
-            (1 + jitter) * DOMAINS[domain].get("gc_interval", CONFIG["gc_interval"]),
+            (1 + jitter) * gc_interval,
             remove_old_email,
             domain,
             max_age,
@@ -80,16 +90,21 @@ class BaseAPIHandler(RequestHandler):
 class PingHandler(BaseAPIHandler):
     async def get(self):
         for header, value in self.request.headers.items():
-            app_log.error("%s: %s", header, value)
+            app_log.info("%s: %s", header, value)
         self.finish("pong")
 
 
 class MailBoxHandler(BaseAPIHandler):
-    def initialize(self, base_maildir):
-        self.base_maildir = base_maildir
+    @property
+    def base_maildir(self):
+        return self.settings["base_maildir"]
 
     async def get(self, address):
         mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
+
+        app_log.debug("debug mailbox message")
+        app_log.info("info mailbox message")
+        app_log.error("error mailbox message")
 
         if not os.path.exists(mail_dir):
             self.write({"emails": []})
@@ -100,8 +115,9 @@ class MailBoxHandler(BaseAPIHandler):
 
 
 class EMailHandler(BaseAPIHandler):
-    def initialize(self, base_maildir):
-        self.base_maildir = base_maildir
+    @property
+    def base_maildir(self):
+        return self.settings["base_maildir"]
 
     async def get(self, address, message_id):
         mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
@@ -174,90 +190,136 @@ class EMailHandler(BaseAPIHandler):
         )
 
 
-class Application(tornado.web.Application):
-    def __init__(self, base_maildir):
-        options = {"base_maildir": base_maildir}
+class WebApplication(tornado.web.Application):
+    def __init__(self, base_maildir, debug=False):
         handlers = [
             (r"/api", PingHandler),
-            (r"/api/([^/]+)", MailBoxHandler, options),
-            (r"/api/([^/]+)/([^/]+)", EMailHandler, options),
+            (r"/api/([^/]+)", MailBoxHandler),
+            (r"/api/([^/]+)/([^/]+)", EMailHandler),
         ]
 
-        settings = dict(debug=True)
+        settings = dict(base_maildir=base_maildir, debug=debug)
         tornado.web.Application.__init__(self, handlers, **settings)
 
 
-def domain_to_path(domain):
-    return hashlib.sha1(domain.lower().strip().encode()).hexdigest()
+def replace_large_parts(message, limit=1024 * 1024):
+    """Replace large MIME parts of the message with a placeholder"""
+    replacement = """
+    This was a MIME part that was replaced by this placeholder because of its
+    size of {size} bytes.
+
+    The original headers follow.
+
+    {headers}
+    """
+    replacement = dedent(replacement).lstrip()
+
+    for part in message.walk():
+        # we can't get the size of a multipart message
+        # which means we first need to check for that
+        if not part.is_multipart():
+            size = len(part.get_content())
+            if size > limit:
+                part.set_content(
+                    replacement.format(
+                        size=size,
+                        content_type=part.get_content_type(),
+                        headers="\n".join(f"{k}: {v}" for k, v in part.items()),
+                    )
+                )
 
 
-def adddress_to_path(address):
-    # XXX maybe remove the "plus" part of the local address?
-    local, _, domain = address.partition("@")
-    return os.path.join(
-        domain_to_path(domain),
-        hashlib.sha1(address.lower().strip().encode()).hexdigest(),
-    )
-
-
-class Mailbox0(Message):
-    def __init__(self, base_maildir, message_class=None):
+class SMTPMailboxHandler(Message):
+    def __init__(self, base_maildir, domains, message_class=None):
         self.base_maildir = base_maildir
+        self.domains = domains
         super().__init__(message_class)
 
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
         address = address.lower()
 
-        if not any(address.endswith(f"@{domain}") for domain in DOMAINS.keys()):
+        if not any(address.endswith(f"@{domain}") for domain in self.domains.keys()):
             return "550 not relaying to that domain"
 
         envelope.rcpt_tos.append(address)
         return "250 OK"
 
     def handle_message(self, message):
+        replace_large_parts(message)
+
         for recipient in message["X-RcptTo"].split(COMMASPACE):
             mail_dir = os.path.join(self.base_maildir, adddress_to_path(recipient))
             mbox = mailbox.Maildir(mail_dir)
             mbox.add(message)
 
 
-def main():
-    base_maildir = CONFIG["base_dir"]
+# configuration per domain for which we will accept emails
+_DEFAULT_DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
 
+
+def start_all(
+    base_maildir="/tmp/mb0",
+    gc_interval=180,
+    debug=False,
+    http_port=8880,
+    smtp_port=25,
+    domains=_DEFAULT_DOMAINS,
+):
     # Setup mailbox directories for all the domains we handle
-    for domain in DOMAINS:
+    for domain in domains:
         os.makedirs(os.path.join(base_maildir, domain_to_path(domain)), exist_ok=True)
 
-    tornado.options.parse_command_line()
-    logging.getLogger().setLevel(logging.DEBUG)
+    tornado.log.enable_pretty_logging()
+    if debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
 
-    http_server = tornado.httpserver.HTTPServer(Application(base_maildir))
-    http_server.listen(8880)
+    http_server = tornado.httpserver.HTTPServer(
+        WebApplication(base_maildir, debug=debug)
+    )
+    http_server.listen(http_port)
 
     loop = asyncio.get_event_loop()
 
     coro = loop.create_server(
         partial(
             SMTPServer,
-            Mailbox0(base_maildir),
+            SMTPMailboxHandler(base_maildir, domains),
             enable_SMTPUTF8=True,
             hostname="mail.mb0.wtte.ch",
         ),
         "0.0.0.0",
-        25,
+        smtp_port,
     )
-    server = loop.run_until_complete(coro)
+    loop.run_until_complete(coro)
 
-    for domain, config in DOMAINS.items():
+    for domain, config in domains.items():
         IOLoop.current().call_later(
-            config.get("gc_interval", CONFIG["gc_interval"]),
+            config.get("gc_interval", gc_interval),
             remove_old_email,
             domain,
             config["max_email_age"],
+            base_maildir,
+            gc_interval,
         )
 
+
+def get_argparser():
+    parser = argparse.ArgumentParser(
+        description="Mailbox Zero - get to Inbox Zero by creating a new inbox"
+    )
+    parser.add_argument(
+        "--debug", help="Enable debug mode", action="store_true", default=False
+    )
+    return parser
+
+
+def main():
+    parser = get_argparser()
+    args = parser.parse_args()
+
+    start_all(debug=args.debug)
+
+    loop = asyncio.get_event_loop()
     loop.run_forever()
-
-
-if __name__ == "__main__":
-    main()
