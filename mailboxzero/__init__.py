@@ -203,6 +203,7 @@ class EMailHandler(BaseAPIHandler):
                 "date": date,
                 "from": message["from"],
                 "x-mailfrom": message["x-mailfrom"],
+                "headers": [f"{k}: {v}" for k, v in message.items()],
             }
         )
 
@@ -217,7 +218,9 @@ class WebApplication(tornado.web.Application):
 
         url_extractor = URLExtract()
 
-        settings = dict(base_maildir=base_maildir, debug=debug, url_extractor=url_extractor)
+        settings = dict(
+            base_maildir=base_maildir, debug=debug, url_extractor=url_extractor
+        )
         tornado.web.Application.__init__(self, handlers, **settings)
 
 
