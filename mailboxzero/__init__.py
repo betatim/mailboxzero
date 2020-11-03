@@ -26,6 +26,8 @@ from tornado.web import RequestHandler, HTTPError
 from aiosmtpd.smtp import SMTP as SMTPServer
 from aiosmtpd.handlers import COMMASPACE
 
+from urlextract import URLExtract
+
 
 def domain_to_path(domain):
     return hashlib.sha1(domain.lower().strip().encode()).hexdigest()
@@ -121,18 +123,28 @@ class EMailHandler(BaseAPIHandler):
     def base_maildir(self):
         return self.settings["base_maildir"]
 
+    @property
+    def url_extractor(self):
+        return self.settings["url_extractor"]
+
+    def add_urls(self, body):
+        """Add list of URLs parsed from the body to the object"""
+        urls = self.url_extractor.find_urls(body["content"])
+        body["urls"] = urls
+
     async def get(self, address, message_id):
+        error_message = {"message": "This email doesn't exist."}
         mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
 
         if not os.path.exists(mail_dir):
             self.set_status(404)
-            self.write({"message": "This mailbox doesn't exist."})
+            self.write(error_message)
             return
 
         mbox = mailbox.Maildir(mail_dir)
         if message_id not in mbox:
             self.set_status(404)
-            self.write({"message": "This email doesn't exist."})
+            self.write(error_message)
             return
 
         mdir_msg = mbox.get_message(message_id)
@@ -180,6 +192,9 @@ class EMailHandler(BaseAPIHandler):
         else:
             date = date.isoformat()
 
+        for body in (richest_body, simplest_body):
+            self.add_urls(body)
+
         self.write(
             {
                 "richestBody": richest_body,
@@ -200,7 +215,9 @@ class WebApplication(tornado.web.Application):
             (r"/api/([^/]+)/([^/]+)", EMailHandler),
         ]
 
-        settings = dict(base_maildir=base_maildir, debug=debug)
+        url_extractor = URLExtract()
+
+        settings = dict(base_maildir=base_maildir, debug=debug, url_extractor=url_extractor)
         tornado.web.Application.__init__(self, handlers, **settings)
 
 

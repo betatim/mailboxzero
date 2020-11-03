@@ -19,7 +19,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.8",
-    install_requires=["aiosmtpd", "tornado"],
+    install_requires=["aiosmtpd", "tornado", "urlextract"],
     entry_points={
         "console_scripts": [
             "mailboxzero = mailboxzero:main",
