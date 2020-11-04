@@ -1,2 +1,4 @@
 __pycache__
 mailboxzero.egg-info/
+build
+dist
