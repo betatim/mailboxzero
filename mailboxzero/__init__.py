@@ -170,7 +170,9 @@ class EMailHandler(BaseAPIHandler):
                 }
         elif richest["content-type"].content_type == "multipart/related":
             richest_body = {
-                "content": html.unescape(richest.get_body(preferencelist=("html",)).get_content()),
+                "content": html.unescape(
+                    richest.get_body(preferencelist=("html",)).get_content()
+                ),
                 "content-type": "text/html",
             }
         else:
@@ -186,7 +188,7 @@ class EMailHandler(BaseAPIHandler):
             "content": "".join(simplest.get_content().splitlines(keepends=True)),
             "content-type": simplest.get_content_type(),
         }
-        if simplest_body['content-type'] == "text/html":
+        if simplest_body["content-type"] == "text/html":
             simplest_body["content"] = html.unescape(simplest_body["content"])
 
         date = parsedate_to_datetime(message["date"])
