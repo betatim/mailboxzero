@@ -2,8 +2,6 @@ import argparse
 import asyncio
 import email
 import email.policy
-import hashlib
-import html
 import json
 import logging
 import mailbox
@@ -12,7 +10,6 @@ import random
 import time
 
 from email.message import EmailMessage
-from email.utils import parsedate_to_datetime
 
 from functools import partial
 
@@ -29,25 +26,15 @@ from aiosmtpd.handlers import COMMASPACE
 
 from urlextract import URLExtract
 
-
-def domain_to_path(domain):
-    return hashlib.sha1(domain.lower().strip().encode()).hexdigest()
-
-
-def adddress_to_path(address):
-    # XXX maybe remove the "plus" part of the local address?
-    local, _, domain = address.partition("@")
-    return os.path.join(
-        domain_to_path(domain),
-        hashlib.sha1(address.lower().strip().encode()).hexdigest(),
-    )
+from . import services
+from . import utils
 
 
 def remove_old_email(domain, max_age, base_maildir, gc_interval):
     """Remove old emails for a given domain"""
     app_log.info(f"Cleaning up old email for {domain}")
     try:
-        maildir = os.path.join(base_maildir, domain_to_path(domain))
+        maildir = os.path.join(base_maildir, utils.domain_to_path(domain))
         app_log.debug(f"Checking {maildir} ...")
 
         now = time.time()
@@ -74,6 +61,10 @@ def remove_old_email(domain, max_age, base_maildir, gc_interval):
 
 
 class BaseAPIHandler(RequestHandler):
+    @property
+    def base_maildir(self):
+        return self.settings["base_maildir"]
+
     def get_json_body(self):
         """Return the body of the request as JSON data."""
         if not self.request.body:
@@ -100,30 +91,14 @@ class PingHandler(BaseAPIHandler):
 
 
 class MailBoxHandler(BaseAPIHandler):
-    @property
-    def base_maildir(self):
-        return self.settings["base_maildir"]
-
     async def get(self, address):
-        mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
+        mailboxes = services.Mailboxes(self.base_maildir)
+        emails = mailboxes.email_ids(address)
 
-        app_log.debug("debug mailbox message")
-        app_log.info("info mailbox message")
-        app_log.error("error mailbox message")
-
-        if not os.path.exists(mail_dir):
-            self.write({"emails": []})
-            return
-
-        mbox = mailbox.Maildir(mail_dir)
-        self.write({"emails": sorted(mbox.keys())})
+        self.write({"emails": emails})
 
 
 class EMailHandler(BaseAPIHandler):
-    @property
-    def base_maildir(self):
-        return self.settings["base_maildir"]
-
     @property
     def url_extractor(self):
         return self.settings["url_extractor"]
@@ -134,83 +109,26 @@ class EMailHandler(BaseAPIHandler):
         body["urls"] = urls
 
     async def get(self, address, message_id):
-        error_message = {"message": "This email doesn't exist."}
-        mail_dir = os.path.join(self.base_maildir, adddress_to_path(address))
+        mailboxes = services.Mailboxes(self.base_maildir)
 
-        if not os.path.exists(mail_dir):
+        error_message = {"message": "This email doesn't exist."}
+
+        if not mailboxes.exists(address):
             self.set_status(404)
             self.write(error_message)
             return
 
-        mbox = mailbox.Maildir(mail_dir)
+        mbox = mailboxes.mbox(address)
         if message_id not in mbox:
             self.set_status(404)
             self.write(error_message)
             return
 
-        mdir_msg = mbox.get_message(message_id)
-        message = email.message_from_bytes(
-            mdir_msg.as_bytes(), _class=EmailMessage, policy=email.policy.default
-        )
-
-        richest = message.get_body()
-        if richest["content-type"].maintype == "text":
-            if richest["content-type"].subtype == "plain":
-                richest_body = {
-                    "content": "\n".join(
-                        line for line in richest.get_content().splitlines()
-                    ),
-                    "content-type": richest.get_content_type(),
-                }
-
-            elif richest["content-type"].subtype == "html":
-                richest_body = {
-                    "content": html.unescape(richest.get_content()),
-                    "content-type": richest.get_content_type(),
-                }
-        elif richest["content-type"].content_type == "multipart/related":
-            richest_body = {
-                "content": html.unescape(
-                    richest.get_body(preferencelist=("html",)).get_content()
-                ),
-                "content-type": "text/html",
-            }
-        else:
-            richest_body = {
-                "content": "Don't know how to display {}".format(
-                    richest.get_content_type()
-                ),
-                "content-type": "text/plain",
-            }
-
-        simplest = message.get_body(preferencelist=("plain", "html"))
-        simplest_body = {
-            "content": "".join(simplest.get_content().splitlines(keepends=True)),
-            "content-type": simplest.get_content_type(),
-        }
-        if simplest_body["content-type"] == "text/html":
-            simplest_body["content"] = html.unescape(simplest_body["content"])
-
-        date = parsedate_to_datetime(message["date"])
-        if date.tzinfo is None:
-            date = date.isoformat() + "+00:00"
-        else:
-            date = date.isoformat()
-
-        for body in (richest_body, simplest_body):
+        message = mailboxes.get_message(address, message_id)
+        for body in (message["richestBody"], message["simplestBody"]):
             self.add_urls(body)
 
-        self.write(
-            {
-                "richestBody": richest_body,
-                "simplestBody": simplest_body,
-                "subject": message["subject"],
-                "date": date,
-                "from": message["from"],
-                "x-mailfrom": message["x-mailfrom"],
-                "headers": [(k, v) for k, v in message.items()],
-            }
-        )
+        self.write(message)
 
 
 class WebApplication(tornado.web.Application):
@@ -221,6 +139,9 @@ class WebApplication(tornado.web.Application):
             (r"/api/([^/]+)/([^/]+)", EMailHandler),
         ]
 
+        # This performs network I/O when instantiated so we start it once
+        # at the very begining and then keep a reference to it instead of
+        # creating a new instance each time we need it
         url_extractor = URLExtract()
 
         settings = dict(
@@ -309,7 +230,9 @@ class SMTPMailboxHandler(_Message):
         replace_large_parts(message)
 
         for recipient in message["X-RcptTo"].split(COMMASPACE):
-            mail_dir = os.path.join(self.base_maildir, adddress_to_path(recipient))
+            mail_dir = os.path.join(
+                self.base_maildir, utils.adddress_to_path(recipient)
+            )
             mbox = mailbox.Maildir(mail_dir)
             mbox.add(message)
 
@@ -328,7 +251,9 @@ def start_all(
 ):
     # Setup mailbox directories for all the domains we handle
     for domain in domains:
-        os.makedirs(os.path.join(base_maildir, domain_to_path(domain)), exist_ok=True)
+        os.makedirs(
+            os.path.join(base_maildir, utils.domain_to_path(domain)), exist_ok=True
+        )
 
     tornado.log.enable_pretty_logging()
     if debug:

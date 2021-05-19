@@ -17,6 +17,8 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
+        "Topic :: Communications :: Email",
+        "Topic :: Communications :: Email :: Mail Transport Agents",
     ],
     python_requires=">=3.8",
     install_requires=["aiosmtpd", "tornado", "urlextract"],
