@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block body %}
+<p>Emails for {{ address }}:</p>
+<ul>
+  {% for email_id in email_ids %}
+    {% module Template("_email_link.html", email_id=email_id) %}
+  {% end %}
+</ul>
+{% end %}

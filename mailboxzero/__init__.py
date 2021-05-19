@@ -15,6 +15,8 @@ from functools import partial
 
 from textwrap import dedent
 
+import bleach
+
 import tornado
 import tornado.options
 from tornado.ioloop import IOLoop
@@ -60,11 +62,80 @@ def remove_old_email(domain, max_age, base_maildir, gc_interval):
         )
 
 
-class BaseAPIHandler(RequestHandler):
+class BaseHandler(RequestHandler):
     @property
     def base_maildir(self):
         return self.settings["base_maildir"]
 
+    @property
+    def url_extractor(self):
+        return self.settings["url_extractor"]
+
+    def force_trailing_slash(self):
+        if not self.request.uri.endswith("/"):
+            self.redirect(self.request.uri + "/", status=301)
+            return
+
+
+class ViewMailBoxHandler(BaseHandler):
+    def get(self, address):
+        self.force_trailing_slash()
+
+        mailboxes = services.Mailboxes(self.base_maildir)
+        emails = mailboxes.email_ids(address)
+
+        self.render("mailbox.html", email_ids=emails, address=address)
+
+
+class ViewEMailHandler(BaseHandler):
+    def get(self, address, message_id):
+        mailboxes = services.Mailboxes(self.base_maildir)
+
+        error_message = {"message": "This email doesn't exist."}
+
+        if not mailboxes.exists(address):
+            self.set_status(404)
+            self.write(error_message)
+            return
+
+        mbox = mailboxes.mbox(address)
+        if message_id not in mbox:
+            self.set_status(404)
+            self.write(error_message)
+            return
+
+        message = mailboxes.get_message(address, message_id)
+
+        if message["richestBody"]["content-type"] == "text/html":
+            print("bleaching")
+            rich_body = bleach.clean(
+                message["richestBody"]["content"],
+                tags=[
+                    "a",
+                    "abbr",
+                    "acronym",
+                    "b",
+                    "blockquote",
+                    "code",
+                    "em",
+                    "i",
+                    "li",
+                    "ol",
+                    "strong",
+                    "ul",
+                    "br",
+                ],
+                strip=True,
+                strip_comments=True,
+            )
+        else:
+            print("bleaching and linking")
+            rich_body = bleach.linkify(bleach.clean(message["richestBody"]["content"]))
+
+        self.render("email.html", subject=message["subject"], rich_body=rich_body)
+
+
+class BaseAPIHandler(BaseHandler):
     def get_json_body(self):
         """Return the body of the request as JSON data."""
         if not self.request.body:
@@ -99,10 +170,6 @@ class MailBoxHandler(BaseAPIHandler):
 
 
 class EMailHandler(BaseAPIHandler):
-    @property
-    def url_extractor(self):
-        return self.settings["url_extractor"]
-
     def add_urls(self, body):
         """Add list of URLs parsed from the body to the object"""
         urls = self.url_extractor.find_urls(body["content"])
@@ -137,6 +204,8 @@ class WebApplication(tornado.web.Application):
             (r"/api", PingHandler),
             (r"/api/([^/]+)", MailBoxHandler),
             (r"/api/([^/]+)/([^/]+)", EMailHandler),
+            (r"/view/([^/]+)/?", ViewMailBoxHandler),
+            (r"/view/([^/]+)/([^/]+)", ViewEMailHandler),
         ]
 
         # This performs network I/O when instantiated so we start it once
@@ -145,7 +214,10 @@ class WebApplication(tornado.web.Application):
         url_extractor = URLExtract()
 
         settings = dict(
-            base_maildir=base_maildir, debug=debug, url_extractor=url_extractor
+            base_maildir=base_maildir,
+            debug=debug,
+            url_extractor=url_extractor,
+            template_path="mailboxzero/templates",
         )
         tornado.web.Application.__init__(self, handlers, **settings)
 
@@ -243,7 +315,7 @@ _DEFAULT_DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
 
 def start_all(
     base_maildir="/tmp/mb0",
-    gc_interval=180,
+    gc_interval=180 * 1000,
     debug=False,
     http_port=8880,
     smtp_port=25,
