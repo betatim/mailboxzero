@@ -10,7 +10,7 @@ from email.utils import parsedate_to_datetime
 from . import utils
 
 
-class Mailbox:
+class Mailboxes:
     def __init__(self, base_maildir):
         # Path at which we can find all the domains we host
         self.base_maildir = base_maildir

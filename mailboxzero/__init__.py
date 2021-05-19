@@ -92,8 +92,8 @@ class PingHandler(BaseAPIHandler):
 
 class MailBoxHandler(BaseAPIHandler):
     async def get(self, address):
-        mailbox_service = services.Mailbox(self.base_maildir)
-        emails = mailbox_service.email_ids(address)
+        mailboxes = services.Mailboxes(self.base_maildir)
+        emails = mailboxes.email_ids(address)
 
         self.write({"emails": emails})
 
@@ -109,22 +109,22 @@ class EMailHandler(BaseAPIHandler):
         body["urls"] = urls
 
     async def get(self, address, message_id):
-        mailbox_service = services.Mailbox(self.base_maildir)
+        mailboxes = services.Mailboxes(self.base_maildir)
 
         error_message = {"message": "This email doesn't exist."}
 
-        if not mailbox_service.exists(address):
+        if not mailboxes.exists(address):
             self.set_status(404)
             self.write(error_message)
             return
 
-        mbox = mailbox_service.mbox(address)
+        mbox = mailboxes.mbox(address)
         if message_id not in mbox:
             self.set_status(404)
             self.write(error_message)
             return
 
-        message = mailbox_service.get_message(address, message_id)
+        message = mailboxes.get_message(address, message_id)
         for body in (message["richestBody"], message["simplestBody"]):
             self.add_urls(body)
 
