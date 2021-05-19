@@ -6,6 +6,7 @@ import json
 import logging
 import mailbox
 import os
+import pathlib
 import random
 import time
 
@@ -30,6 +31,9 @@ from urlextract import URLExtract
 
 from . import services
 from . import utils
+
+
+HERE = pathlib.Path(__file__).parent.absolute()
 
 
 def remove_old_email(domain, max_age, base_maildir, gc_interval):
@@ -217,7 +221,7 @@ class WebApplication(tornado.web.Application):
             base_maildir=base_maildir,
             debug=debug,
             url_extractor=url_extractor,
-            template_path="mailboxzero/templates",
+            template_path=os.path.join(HERE, "templates"),
         )
         tornado.web.Application.__init__(self, handlers, **settings)
 
