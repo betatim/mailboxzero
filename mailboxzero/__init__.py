@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import email
 import email.policy
+import html
 import json
 import logging
 import mailbox
@@ -111,32 +112,24 @@ class ViewEMailHandler(BaseHandler):
         message = mailboxes.get_message(address, message_id)
 
         if message["richestBody"]["content-type"] == "text/html":
-            print("bleaching")
-            rich_body = bleach.clean(
-                message["richestBody"]["content"],
-                tags=[
-                    "a",
-                    "abbr",
-                    "acronym",
-                    "b",
-                    "blockquote",
-                    "code",
-                    "em",
-                    "i",
-                    "li",
-                    "ol",
-                    "strong",
-                    "ul",
-                    "br",
-                ],
-                strip=True,
-                strip_comments=True,
-            )
-        else:
-            print("bleaching and linking")
-            rich_body = bleach.linkify(bleach.clean(message["richestBody"]["content"]))
+            message_html = utils.rewrite_html(message["richestBody"]["content"])
 
-        self.render("email.html", subject=message["subject"], rich_body=rich_body)
+        else:
+            message_html = bleach.linkify(
+                bleach.clean(message["richestBody"]["content"], strip=True)
+            )
+
+        escaped_message = html.escape(message_html)
+
+        # Try and make loading untrusted content from the email a little less
+        # risky and private
+        self.set_header("Referrer-Policy", "no-referrer")
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("X-XSS-Protection", "1; mode=block")
+
+        self.render(
+            "email.html", subject=message["subject"], raw_message_html=escaped_message
+        )
 
 
 class BaseAPIHandler(BaseHandler):
@@ -319,7 +312,7 @@ _DEFAULT_DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
 
 def start_all(
     base_maildir="/tmp/mb0",
-    gc_interval=180 * 1000,
+    gc_interval=180,
     debug=False,
     http_port=8880,
     smtp_port=25,

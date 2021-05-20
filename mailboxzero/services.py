@@ -22,8 +22,6 @@ class Mailboxes:
     def exists(self, address):
         """Determine if a mailbox for address exists"""
         mail_dir = self.mail_dir_for(address)
-        print("Mail dir is:", mail_dir)
-
         return os.path.exists(mail_dir)
 
     def mbox(self, address):
