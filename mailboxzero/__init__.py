@@ -312,7 +312,7 @@ _DEFAULT_DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
 
 def start_all(
     base_maildir="/tmp/mb0",
-    gc_interval=180 * 1000,
+    gc_interval=180,
     debug=False,
     http_port=8880,
     smtp_port=25,
