@@ -2,8 +2,15 @@
 {% block body %}
 <h1>{{ subject }}</h1>
 
-<div>
-  {% raw rich_body %}
-</div>
 
+<iframe
+  id="message"
+  referrerpolicy="no-referrer"
+  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+  onload='javascript:(function(o){o.style.height=o.contentWindow.document.body.scrollHeight+"px";}(this));' style="height:400px;width:100%;border:none;overflow:hidden;"
+  srcdoc="{% raw raw_message_html %}">
+</iframe>
+
+<!-- allow="camera 'none'; microphone 'none'; layout-animations 'none'; unoptimized-images 'none'; oversized-images 'none'; sync-script 'none'; sync-xhr 'none'; unsized-media 'none';">
+ -->
 {% end %}
