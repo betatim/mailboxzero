@@ -79,7 +79,7 @@ class BaseHandler(RequestHandler):
     def force_trailing_slash(self):
         if not self.request.uri.endswith("/"):
             self.redirect(self.request.uri + "/", status=301)
-            return
+            raise web.Finish()
 
 
 class ViewMailBoxHandler(BaseHandler):
