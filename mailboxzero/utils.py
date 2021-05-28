@@ -17,12 +17,19 @@ def adddress_to_path(address):
     )
 
 
-def rewrite_html(html_document):
+def rewrite_html(html_document, content_url):
     """Rewrite input HTML to make it more privacy friendly"""
     soup = BeautifulSoup(html_document, "html.parser")
 
     for node in soup.find_all(["a"]):
         node["target"] = "_blank"
+
+    for img in soup.find_all(["img"]):
+        img["loading"] = "lazy"
+        img["decoding"] = "async"
+
+        if img["src"].startswith("cid:"):
+            img["src"] = content_url + img["src"][4:]
 
     # Setting this leads to images not loading because of missing CORS headers
     # in the response from the server we fetch them from

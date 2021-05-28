@@ -79,7 +79,7 @@ class BaseHandler(RequestHandler):
     def force_trailing_slash(self):
         if not self.request.uri.endswith("/"):
             self.redirect(self.request.uri + "/", status=301)
-            raise web.Finish()
+            raise tornado.web.Finish()
 
 
 class ViewMailBoxHandler(BaseHandler):
@@ -110,9 +110,15 @@ class ViewEMailHandler(BaseHandler):
             return
 
         message = mailboxes.get_message(address, message_id)
+        attachments = mailboxes.get_attachment_summaries(address, message_id)
+
+        content_base_url = f"/content/{address}/{message_id}/"
 
         if message["richestBody"]["content-type"] == "text/html":
-            message_html = utils.rewrite_html(message["richestBody"]["content"])
+
+            message_html = utils.rewrite_html(
+                message["richestBody"]["content"], content_base_url
+            )
 
         else:
             message_html = bleach.linkify(
@@ -128,8 +134,36 @@ class ViewEMailHandler(BaseHandler):
         self.set_header("X-XSS-Protection", "1; mode=block")
 
         self.render(
-            "email.html", subject=message["subject"], raw_message_html=escaped_message
+            "email.html",
+            subject=message["subject"],
+            raw_message_html=escaped_message,
+            content_base_url=content_base_url,
+            attachments=attachments,
         )
+
+
+class ContentHandler(BaseHandler):
+    async def get(self, address, message_id, content_id):
+        """Serve content from message_id referred to by content_id"""
+        mailboxes = services.Mailboxes(self.base_maildir)
+
+        # if the client has an etag they must have visited before and the
+        # content won't have changed for the same message_id and content_id
+        # so we can take a shortcut here and reply "not modified"
+        if "If-None-Match" in self.request.headers:
+            self.set_status(304)
+            return
+
+        content = mailboxes.get_content(address, message_id, content_id)
+        if content is None:
+            self.set_status(404)
+            self.write({"message": "Content does not exist."})
+            return
+
+        self.set_header("cache-control", "public, max-age=0, must-revalidate")
+        self.set_header("age", "0")
+        self.set_header("content-type", content.get_content_type())
+        self.write(content.get_content())
 
 
 class BaseAPIHandler(BaseHandler):
@@ -203,6 +237,7 @@ class WebApplication(tornado.web.Application):
             (r"/api/([^/]+)/([^/]+)", EMailHandler),
             (r"/view/([^/]+)/?", ViewMailBoxHandler),
             (r"/view/([^/]+)/([^/]+)", ViewEMailHandler),
+            (r"/content/([^/]+)/([^/]+)/([^/]+)", ContentHandler),
         ]
 
         # This performs network I/O when instantiated so we start it once
@@ -307,7 +342,10 @@ class SMTPMailboxHandler(_Message):
 
 
 # configuration per domain for which we will accept emails
-_DEFAULT_DOMAINS = {"mb0.wtte.ch": {"max_email_age": 600}}
+_DEFAULT_DOMAINS = {
+    "mb0.wtte.ch": {"max_email_age": 600 * 1000},
+    "qmq.ch": {"max_email_age": 600 * 1000},
+}
 
 
 def start_all(

@@ -1,14 +1,33 @@
 {% extends "base.html" %}
 {% block body %}
-<h1>{{ subject }}</h1>
 
+<main class="mt-5">
+  <h1>{{ subject }}</h1>
 
-<iframe
-  id="message"
-  referrerpolicy="no-referrer"
-  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-  onload='javascript:(function(o){o.style.height=o.contentWindow.document.documentElement.scrollHeight+"px";}(this));' style="height:400px;width:100%;border:none;overflow:hidden;"
-  srcdoc="{% raw raw_message_html %}">
-</iframe>
+  <iframe
+    class="mb-3"
+    id="message"
+    referrerpolicy="no-referrer"
+    scrolling="no"
+    sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+    onload='javascript:(function(o){o.style.height=o.contentWindow.document.documentElement.scrollHeight+"px";}(this));'
+    onresize='javascript:(function(o){o.style.height=o.contentWindow.document.documentElement.scrollHeight+"px";}(this));'
+    style="height:400px;width:100%;border:none;overflow:hidden;"
+    srcdoc="{% raw raw_message_html %}">
+  </iframe>
+</main>
+
+{% if attachments %}
+<p>This email has attachments 🎉</p>
+  <ul>
+  {% for attachment in attachments %}
+  <li>
+    <a download="{{ attachment['fname'] }}" href="{{ content_base_url + attachment['cid'] }}">{{ attachment["fname"] }}</a>
+  </li>
+  {% end %}
+  </ul>
+{% else %}
+<p>This email has no attachments 🤨</p>
+{% end %}
 
 {% end %}
