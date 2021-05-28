@@ -28,14 +28,42 @@ class Mailboxes:
         """Get the mailbox for address"""
         return mailbox.Maildir(self.mail_dir_for(address))
 
-    def get_message(self, address, message_id):
-        """Extract and parse message"""
+    def _get_email(self, address, message_id):
         mbox = self.mbox(address)
 
         mdir_msg = mbox.get_message(message_id)
         message = email.message_from_bytes(
             mdir_msg.as_bytes(), _class=EmailMessage, policy=email.policy.default
         )
+        return message
+
+    def get_content(self, address, message_id, content_id):
+        """Extract MIME part labelled with content_id"""
+        content_id = f"<{content_id}>"
+        message = self._get_email(address, message_id)
+        for part in message.walk():
+            if part.get("content-id") == content_id:
+                return part
+
+    def get_attachment_summaries(self, address, message_id):
+        """Get summary information about the attachments of this email"""
+        message = self._get_email(address, message_id)
+        attachments = []
+        for attachment in message.iter_attachments():
+            attachments.append(
+                {
+                    "content-type": attachment.get_content_type(),
+                    "fname": attachment.get_filename(),
+                    "size": len(attachment.get_content()),
+                    "cid": attachment["content-id"][1:-1],
+                }
+            )
+
+        return attachments
+
+    def get_message(self, address, message_id):
+        """Extract and parse message"""
+        message = self._get_email(address, message_id)
 
         richest = message.get_body()
         if richest["content-type"].maintype == "text":
