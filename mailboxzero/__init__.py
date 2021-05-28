@@ -343,8 +343,8 @@ class SMTPMailboxHandler(_Message):
 
 # configuration per domain for which we will accept emails
 _DEFAULT_DOMAINS = {
-    "mb0.wtte.ch": {"max_email_age": 600 * 1000},
-    "qmq.ch": {"max_email_age": 600 * 1000},
+    "mb0.wtte.ch": {"max_email_age": 600},
+    "qmq.ch": {"max_email_age": 600},
 }
 
 
