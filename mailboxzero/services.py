@@ -50,14 +50,15 @@ class Mailboxes:
         message = self._get_email(address, message_id)
         attachments = []
         for attachment in message.iter_attachments():
-            attachments.append(
-                {
-                    "content-type": attachment.get_content_type(),
-                    "fname": attachment.get_filename(),
-                    "size": len(attachment.get_content()),
-                    "cid": attachment["content-id"][1:-1],
-                }
-            )
+            if attachment.get_content_disposition() == "attachment":
+                attachments.append(
+                    {
+                        "content-type": attachment.get_content_type(),
+                        "fname": attachment.get_filename(),
+                        "size": len(attachment.get_content()),
+                        "cid": attachment["content-id"][1:-1],
+                    }
+                )
 
         return attachments
 
