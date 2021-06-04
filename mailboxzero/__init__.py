@@ -67,6 +67,16 @@ def remove_old_email(domain, max_age, base_maildir, gc_interval):
         )
 
 
+class WelcomeHandler(RequestHandler):
+    def get(self):
+        email = self.get_argument("email", default="")
+        if email:
+            self.redirect(f"/view/{email}/")
+
+        else:
+            self.render("welcome.html")
+
+
 class BaseHandler(RequestHandler):
     @property
     def base_maildir(self):
@@ -232,6 +242,7 @@ class EMailHandler(BaseAPIHandler):
 class WebApplication(tornado.web.Application):
     def __init__(self, base_maildir, debug=False):
         handlers = [
+            (r"/", WelcomeHandler),
             (r"/api", PingHandler),
             (r"/api/([^/]+)", MailBoxHandler),
             (r"/api/([^/]+)/([^/]+)", EMailHandler),
@@ -250,6 +261,7 @@ class WebApplication(tornado.web.Application):
             debug=debug,
             url_extractor=url_extractor,
             template_path=os.path.join(HERE, "templates"),
+            static_path=os.path.join(HERE, "static"),
         )
         tornado.web.Application.__init__(self, handlers, **settings)
 

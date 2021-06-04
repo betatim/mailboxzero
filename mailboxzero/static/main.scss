@@ -1,0 +1,11 @@
+//@import "../../node_modules/bootstrap/scss/bootstrap";
+
+$red: #c00;
+$pink: #e21181;
+$primary: $red;
+
+$paragraph-margin-bottom: 1rem;
+
+$enable-responsive-font-sizes: true;
+
+@import "~bootstrap/scss/bootstrap";
