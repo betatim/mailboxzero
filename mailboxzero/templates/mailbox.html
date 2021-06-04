@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {% block body %}
-<h1 class="mt-5">Emails for {{ address }}</h1>
-<p class="lead">These are all the emails we have:</p>
+<h1 class="mb-4">Emails for <span class="user-select-all">{{ address }}<span></h1>
+{% if not email_ids%}
+<p>This inbox is empty.</p>
+{% else %}
+<p class="mb-4">These are the emails we have:</p>
 <ul>
   {% for email_id in email_ids %}
     {% module Template("_email_link.html", email_id=email_id) %}
   {% end %}
 </ul>
+{% end %}
 {% end %}
