@@ -9,6 +9,7 @@ import mailbox
 import os
 import pathlib
 import random
+import string
 import time
 
 from email.message import EmailMessage
@@ -293,6 +294,25 @@ def replace_large_parts(message, limit=1024 * 1024):
                 )
 
 
+def generate_id():
+    return "".join(
+        [random.choice(string.ascii_lowercase + string.digits) for _ in range(8)]
+    )
+
+
+def ensure_attachment_cids(message):
+    """Ensure that every attachment has a Content-ID header
+
+    We use the value of the Content-ID to refer to an attachment in download
+    links so we need every attachment to have one.
+    """
+    for attachment in message.iter_attachments():
+        if attachment.get_content_disposition() == "attachment":
+            if "content-id" not in attachment:
+                cid = generate_id()
+                attachment["content-id"] = f"<{cid}>"
+
+
 # Our own copy of aiosmtpd.handlers.Message so we can set the policy
 class _Message:
     def __init__(self, message_class=None):
@@ -344,6 +364,7 @@ class SMTPMailboxHandler(_Message):
 
     def handle_message(self, message):
         replace_large_parts(message)
+        ensure_attachment_cids(message)
 
         for recipient in message["X-RcptTo"].split(COMMASPACE):
             mail_dir = os.path.join(
