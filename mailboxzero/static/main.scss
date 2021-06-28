@@ -9,3 +9,15 @@ $paragraph-margin-bottom: 1rem;
 $enable-responsive-font-sizes: true;
 
 @import "~bootstrap/scss/bootstrap";
+
+[data-controller='clipboard'] {
+  &:hover {
+    cursor: pointer;
+  }
+
+  [data-clipboard-target='notification'] {
+    transition: opacity 450ms ease-out 0s;
+    opacity: 0;
+    visibility: hidden;
+  }
+}

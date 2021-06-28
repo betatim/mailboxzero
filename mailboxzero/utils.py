@@ -45,7 +45,7 @@ def rewrite_html(html_document, content_url):
     )
     """<meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">"""
-    #viewport = soup.new_tag("meta", name="viewport")
+    # viewport = soup.new_tag("meta", name="viewport")
 
     if soup.head is None:
         print("adding head tag")

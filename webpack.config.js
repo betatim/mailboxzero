@@ -1,6 +1,12 @@
+const path = require('path')
+const glob = require('glob')
 const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const PurgecssPlugin = require('purgecss-webpack-plugin')
 
+const PATHS = {
+  src: path.join(__dirname, 'mailboxzero')
+}
 
 module.exports = {
   mode: "production", //"development",
@@ -10,6 +16,18 @@ module.exports = {
     path: __dirname + "/mailboxzero/static/dist/",
     filename: "bundle.js",
     publicPath: "/static/dist/"
+  },
+  optimization: {
+    splitChunks: {
+      cacheGroups: {
+        styles: {
+          name: 'styles',
+          test: /\.css$/,
+          chunks: 'all',
+          enforce: true
+        }
+      }
+    }
   },
   module: {
     rules: [
@@ -56,8 +74,13 @@ module.exports = {
   devtool: "source-map",
   plugins: [
     new MiniCssExtractPlugin({
-      //filename: isProductionMode ? "[name].[contenthash].css" : "[name].css",
       filename: "[name].css",
+    }),
+    new PurgecssPlugin({
+      paths: glob.sync(`${PATHS.src}/**/*`,  { nodir: true }),
+      //safelist: [ /.*file-selector-button.*/],
+      variables: true,
+      rejected: true,
     }),
   ],
 };
