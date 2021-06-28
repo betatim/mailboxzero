@@ -14,13 +14,22 @@
       <form method="get" class="row row-cols-lg-auto g-3 align-items-end">
         <div class="col-12">
           <label class="form-label" for="email">Enter address</label>
-          <input type="email" class="form-control" name="email" id="email" placeholder="hello@qmq.ch" required>
+          <input type="email" class="form-control" name="email" id="email" placeholder="hello@qmq.ch" required autofocus>
         </div>
         <div class="col-12">
           <input type="submit" class="btn btn-primary" value="View inbox">
         </div>
       </form>
     </div>
+    <p>
+      Can't think of an email to use? Try
+      <span data-controller="clipboard" style="display: inline-block">
+        <span data-clipboard-target="source" data-action="click->clipboard#copy" class="font-monospace user-select-all">{{ random_email }}</span>
+        <button data-action="clipboard#copy" class="btn btn-outline-secondary btn-sm position-relative">
+          Copy <span data-clipboard-target="notification" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary">Copied</span>
+        </button>
+      </span>
+    </p>
   </div>
 </main>
 {% end %}

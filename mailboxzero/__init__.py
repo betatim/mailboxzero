@@ -31,6 +31,8 @@ from aiosmtpd.handlers import COMMASPACE
 
 from urlextract import URLExtract
 
+import friendlywords
+
 from . import services
 from . import utils
 
@@ -75,7 +77,10 @@ class WelcomeHandler(RequestHandler):
             self.redirect(f"/view/{email}/")
 
         else:
-            self.render("welcome.html")
+            predicate = random.choice(friendlywords.predicates)
+            object = random.choice(friendlywords.objects)
+            random_email = f"{predicate}-{object}@qmq.ch"
+            self.render("welcome.html", random_email=random_email)
 
 
 class BaseHandler(RequestHandler):
