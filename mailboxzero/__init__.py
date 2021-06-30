@@ -412,7 +412,8 @@ def start_all(
         logging.getLogger().setLevel(logging.INFO)
 
     http_server = tornado.httpserver.HTTPServer(
-        WebApplication(base_maildir, debug=debug)
+        WebApplication(base_maildir, debug=debug),
+        xheaders=True,
     )
     http_server.listen(http_port)
 
