@@ -6,6 +6,7 @@ $primary: $red;
 
 $paragraph-margin-bottom: 1rem;
 
+$enable-negative-margins: true;
 $enable-responsive-font-sizes: true;
 
 @import "~bootstrap/scss/bootstrap";
@@ -19,5 +20,13 @@ $enable-responsive-font-sizes: true;
     transition: opacity 450ms ease-out 0s;
     opacity: 0;
     visibility: hidden;
+  }
+}
+
+.mailbox-item {
+  @extend .p-2;
+  @extend .ms-n2;
+  &:hover {
+    background-color: rgba(204, 0, 0, 0.05) !important;
   }
 }

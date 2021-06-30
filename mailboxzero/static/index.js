@@ -1,5 +1,9 @@
 import './main.scss';
 
+//import { LocalTimeElement } from "@github/time-elements"
+import LocalTime from "local-time"
+LocalTime.start()
+
 import * as Turbo from "@hotwired/turbo"
 
 import { Application } from "stimulus"

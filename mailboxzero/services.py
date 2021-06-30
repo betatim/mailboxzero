@@ -104,11 +104,7 @@ class Mailboxes:
         if simplest_body["content-type"] == "text/html":
             simplest_body["content"] = html.unescape(simplest_body["content"])
 
-        date = parsedate_to_datetime(message["date"])
-        if date.tzinfo is None:
-            date = date.isoformat() + "+00:00"
-        else:
-            date = date.isoformat()
+        date = self._date_string(message)
 
         return {
             "richestBody": richest_body,
@@ -129,3 +125,31 @@ class Mailboxes:
 
         mbox = mailbox.Maildir(mail_dir)
         return list(sorted(mbox.keys()))
+
+    def _date_string(self, message):
+        date = parsedate_to_datetime(message["date"])
+        if date.tzinfo is None:
+            date = date.isoformat() + "+00:00"
+        else:
+            date = date.isoformat()
+        return date
+
+    def get_message_summaries(self, address):
+        mail_dir = self.mail_dir_for(address)
+
+        if not os.path.exists(mail_dir):
+            return {}
+
+        summaries = {}
+
+        mbox = mailbox.Maildir(mail_dir)
+        for key, msg in mbox.iteritems():
+            summary = {
+                "date": self._date_string(msg),
+                "id": key,
+                "from": msg["from"],
+                "subject": msg["subject"],
+            }
+            summaries[key] = summary
+
+        return summaries

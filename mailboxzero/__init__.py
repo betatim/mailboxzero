@@ -13,9 +13,8 @@ import string
 import time
 
 from email.message import EmailMessage
-
 from functools import partial
-
+from operator import itemgetter
 from textwrap import dedent
 
 import bleach
@@ -103,9 +102,15 @@ class ViewMailBoxHandler(BaseHandler):
         self.force_trailing_slash()
 
         mailboxes = services.Mailboxes(self.base_maildir)
-        emails = mailboxes.email_ids(address)
+        summaries = mailboxes.get_message_summaries(address)
+        email_ids = list(sorted(summaries))
 
-        self.render("mailbox.html", email_ids=emails, address=address)
+        self.render(
+            "mailbox.html",
+            email_ids=email_ids,
+            address=address,
+            summaries=summaries,
+        )
 
 
 class ViewEMailHandler(BaseHandler):

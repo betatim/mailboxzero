@@ -21,7 +21,14 @@ setuptools.setup(
         "Topic :: Communications :: Email :: Mail Transport Agents",
     ],
     python_requires=">=3.8",
-    install_requires=["aiosmtpd", "tornado", "urlextract", "bleach", "beautifulsoup4", "py-friendlywords"],
+    install_requires=[
+        "aiosmtpd",
+        "tornado",
+        "urlextract",
+        "bleach",
+        "beautifulsoup4",
+        "py-friendlywords",
+    ],
     entry_points={
         "console_scripts": [
             "mailboxzero = mailboxzero:main",
