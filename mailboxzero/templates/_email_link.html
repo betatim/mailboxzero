@@ -1,1 +1,18 @@
-<li><a href="{{ email_id }}">{{ email_id }}</a></li>
+<div class="mailbox-item">
+  <a href="{{ email_id }}" class="d-flex align-items-center text-decoration-none link-dark">
+    <div class="overflow-hidden w-100">
+      <h3 class="text-truncate" style="max-width: calc(100% - 7rem)">
+        {{ summary["subject"] }}
+      </h3>
+      <p class="text-truncate mb-0" style="max-width: calc(100% - 7rem)">
+        {{ summary["from"] }}
+      </p>
+    </div>
+   <time data-format="%H:%M"
+      data-local="time"
+      datetime="{{ summary['date'] }}">
+      {{ summary['date'] }}
+    </time>
+
+  </a>
+</div>
