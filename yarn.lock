@@ -873,6 +873,11 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.3.tgz#90420f9f9c6d3987f176a19a7d8e764271a2f55d"
   integrity sha512-Fxt+AfXgjMoin2maPIYzFZnQjAXjAL0PHscM5pRTtatFqB+vZxAM9tLp2Optnuw3QOQC40jTNeGYFOMvyf7v9g==
 
+"@github/time-elements@^3.1.2":
+  version "3.1.2"
+  resolved "https://registry.yarnpkg.com/@github/time-elements/-/time-elements-3.1.2.tgz#cc36d7a34ff2033d7f0b216f1a724405b8fbc201"
+  integrity sha512-YVtZVLBikP6I7na22kfB9PKIseISwX41MFJ7lPuNz1VVH2IR5cpRRU6F1X6kcchPChljuvMUR4OiwMWHOJQ8kQ==
+
 "@hotwired/turbo@^7.0.0-beta.7":
   version "7.0.0-beta.7"
   resolved "https://registry.yarnpkg.com/@hotwired/turbo/-/turbo-7.0.0-beta.7.tgz#0f519af4e63698a9fb44d2db9019cdb5ddd048db"
@@ -1802,6 +1807,11 @@ loader-utils@^2.0.0:
     big.js "^5.2.2"
     emojis-list "^3.0.0"
     json5 "^2.1.2"
+
+local-time@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/local-time/-/local-time-2.1.0.tgz#be42f06bf269f9da77cb61ea722aa424dd01d919"
+  integrity sha512-4rB/8EkJIZ8O8Y5q536fSsRbzXOI0cL30l3ZKm4ISPC4D8jYOhRp/MpAaGKAYUvVIqkojT0c7kJk0RlnwtlR2w==
 
 locate-path@^5.0.0:
   version "5.0.0"
