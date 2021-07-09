@@ -415,7 +415,7 @@ def start_all(
         WebApplication(base_maildir, debug=debug),
         xheaders=True,
     )
-    http_server.listen(http_port)
+    http_server.listen(http_port, "127.0.0.1")
 
     loop = asyncio.get_event_loop()
 

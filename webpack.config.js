@@ -9,7 +9,8 @@ const PATHS = {
 }
 
 module.exports = {
-  mode: "production", //"development",
+  mode: "production",
+  //mode: "development",
   context: __dirname + "/mailboxzero/static/",
   entry: "./index.js",
   output: {
