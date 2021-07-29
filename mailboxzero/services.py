@@ -26,15 +26,19 @@ class Mailboxes:
 
     def mbox(self, address):
         """Get the mailbox for address"""
-        return mailbox.Maildir(self.mail_dir_for(address))
+        return mailbox.Maildir(
+            self.mail_dir_for(address),
+            factory=lambda f: email.message_from_binary_file(
+                f, policy=email.policy.default
+            ),
+        )
 
     def _get_email(self, address, message_id):
         mbox = self.mbox(address)
 
-        mdir_msg = mbox.get_message(message_id)
-        message = email.message_from_bytes(
-            mdir_msg.as_bytes(), _class=EmailMessage, policy=email.policy.default
-        )
+        # don't use `get_message()` as that sets additional things that the
+        # generic EmailMessage class doesn't support (like folders)
+        message = mbox[message_id]
         return message
 
     def get_content(self, address, message_id, content_id):
@@ -142,7 +146,8 @@ class Mailboxes:
 
         summaries = {}
 
-        mbox = mailbox.Maildir(mail_dir)
+        mbox = self.mbox(address)
+
         for key, msg in mbox.iteritems():
             summary = {
                 "date": self._date_string(msg),

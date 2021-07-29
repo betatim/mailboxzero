@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block body %}
 <h1 class="mb-4">Emails for
-  <span class="position-relative" data-controller="clipboard" data-action="click->clipboard#copy">
-    <span class="user-select-all" data-clipboard-target="source">{{ address }}</span>
-    <span data-clipboard-target="notification" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary fs-6">Copied</span>
+  <span
+    class="position-relative"
+    data-controller="clipboard"
+    data-action="click->clipboard#copy">
+      <span class="user-select-all" data-clipboard-target="source">{{ address }}</span>
+      <span data-clipboard-target="notification" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary fs-6">Copied</span>
   </span>
 </h1>
 {% if not email_ids%}
