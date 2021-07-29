@@ -1,6 +1,5 @@
 import './main.scss';
 
-//import { LocalTimeElement } from "@github/time-elements"
 import LocalTime from "local-time"
 LocalTime.start()
 
