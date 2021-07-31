@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block body %}
 
+<a href="./" class="link-secondary mb-4 d-block">&larr; Back to Inbox</a>
+
 <main>
-  <h1 class="mb-2">{{ subject }}</h1>
+  <h1 class="mb-4" style="hyphens: auto; overflow-wrap: break-word; word-wrap: break-word;">{{ subject }}</h1>
 
   <iframe
     class="mb-4"
@@ -26,8 +28,6 @@
   </li>
   {% end %}
   </ul>
-{% else %}
-<p>This email has no attachments 🤨</p>
 {% end %}
 
 {% end %}
