@@ -403,7 +403,7 @@ _DEFAULT_DOMAINS = {
 
 def start_all(
     base_maildir="/tmp/mb0",
-    gc_interval=180 * 10000,
+    gc_interval=180,
     debug=False,
     http_port=8880,
     smtp_port=25,
