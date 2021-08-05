@@ -14,6 +14,7 @@
 </h1>
 {% if not email_ids%}
 <p>This inbox is empty.</p>
+<p class="text-muted">Click the email address to copy it to your clipboard.</p>
 {% else %}
   {% for email_id in email_ids %}
     {% module Template("_email_link.html", email_id=email_id, summary=summaries[email_id]) %}

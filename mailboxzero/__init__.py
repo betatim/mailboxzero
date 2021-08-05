@@ -82,6 +82,15 @@ class WelcomeHandler(RequestHandler):
             self.render("welcome.html", random_email=random_email)
 
 
+class QuickHandler(RequestHandler):
+    def get(self):
+        predicate = random.choice(friendlywords.predicates)
+        object = random.choice(friendlywords.objects)
+        random_email = f"{predicate}-{object}@qmq.ch"
+
+        self.redirect(f"/view/{random_email}/")
+
+
 class BaseHandler(RequestHandler):
     @property
     def base_maildir(self):
@@ -254,6 +263,7 @@ class WebApplication(tornado.web.Application):
     def __init__(self, base_maildir, debug=False):
         handlers = [
             (r"/", WelcomeHandler),
+            (r"/q", QuickHandler),
             (r"/api", PingHandler),
             (r"/api/([^/]+)", MailBoxHandler),
             (r"/api/([^/]+)/([^/]+)", EMailHandler),
@@ -393,7 +403,7 @@ _DEFAULT_DOMAINS = {
 
 def start_all(
     base_maildir="/tmp/mb0",
-    gc_interval=180,
+    gc_interval=180 * 10000,
     debug=False,
     http_port=8880,
     smtp_port=25,
