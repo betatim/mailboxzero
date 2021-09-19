@@ -14,7 +14,6 @@ import time
 
 from email.message import EmailMessage
 from functools import partial
-from operator import itemgetter
 from textwrap import dedent
 
 import bleach

@@ -12,12 +12,15 @@
       <span data-clipboard-target="notification" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary fs-6">Copied</span>
   </span>
 </h1>
-{% if not email_ids%}
-<p>This inbox is empty.</p>
-<p class="text-muted">Click the email address to copy it to your clipboard.</p>
-{% else %}
-  {% for email_id in email_ids %}
-    {% module Template("_email_link.html", email_id=email_id, summary=summaries[email_id]) %}
+
+<turbo-frame id="messages" data-controller="refresh" data-refresh-interval-value="5000" data-refresh-src-value="/view/{{ address }}/" target="_top">
+  {% if not email_ids%}
+    <p>This inbox is empty.</p>
+    <p class="text-muted">Click the email address to copy it to your clipboard.</p>
+  {% else %}
+    {% for email_id in email_ids %}
+      {% module Template("_email_link.html", email_id=email_id, summary=summaries[email_id]) %}
+    {% end %}
   {% end %}
-{% end %}
+</turbo-frame>
 {% end %}
