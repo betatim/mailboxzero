@@ -68,7 +68,7 @@ def remove_old_email(domain, max_age, base_maildir, gc_interval):
         )
 
 
-class WelcomeHandler(RequestHandler):
+class ViewHandler(RequestHandler):
     def get(self):
         email = self.get_argument("email", default="")
         if email:
@@ -78,7 +78,7 @@ class WelcomeHandler(RequestHandler):
             predicate = random.choice(friendlywords.predicates)
             object = random.choice(friendlywords.objects)
             random_email = f"{predicate}-{object}@qmq.ch"
-            self.render("welcome.html", random_email=random_email)
+            self.render("view.html", random_email=random_email)
 
 
 class QuickHandler(RequestHandler):
@@ -146,7 +146,9 @@ class ViewEMailHandler(BaseHandler):
         if message["richestBody"]["content-type"] == "text/html":
 
             message_html = utils.rewrite_html(
-                message["richestBody"]["content"], content_base_url
+                message["richestBody"]["content"],
+                content_base_url,
+                make_static_url=self.static_url,
             )
 
         else:
@@ -261,8 +263,9 @@ class EMailHandler(BaseAPIHandler):
 class WebApplication(tornado.web.Application):
     def __init__(self, base_maildir, debug=False):
         handlers = [
-            (r"/", WelcomeHandler),
+            (r"/", QuickHandler),
             (r"/q", QuickHandler),
+            (r"/view", ViewHandler),
             (r"/api", PingHandler),
             (r"/api/([^/]+)", MailBoxHandler),
             (r"/api/([^/]+)/([^/]+)", EMailHandler),

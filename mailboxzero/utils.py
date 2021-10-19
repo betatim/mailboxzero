@@ -17,7 +17,7 @@ def adddress_to_path(address):
     )
 
 
-def rewrite_html(html_document, content_url):
+def rewrite_html(html_document, content_url, make_static_url):
     """Rewrite input HTML to make it more privacy friendly"""
     soup = BeautifulSoup(html_document, "html.parser")
 
@@ -38,17 +38,14 @@ def rewrite_html(html_document, content_url):
 
     bs_style = soup.new_tag(
         "link",
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css",
+        href=make_static_url("dist/main.css"),
         rel="stylesheet",
-        integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6",
-        crossorigin="anonymous",
     )
     """<meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">"""
     # viewport = soup.new_tag("meta", name="viewport")
 
     if soup.head is None:
-        print("adding head tag")
         soup.insert(0, soup.new_tag("head"))
 
     soup.head.insert(0, bs_style)
