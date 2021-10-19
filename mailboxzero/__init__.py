@@ -81,7 +81,7 @@ class ViewHandler(RequestHandler):
             self.render("view.html", random_email=random_email)
 
 
-class IndexHandler(RequestHandler):
+class QuickHandler(RequestHandler):
     def get(self):
         predicate = random.choice(friendlywords.predicates)
         object = random.choice(friendlywords.objects)
@@ -146,7 +146,8 @@ class ViewEMailHandler(BaseHandler):
         if message["richestBody"]["content-type"] == "text/html":
 
             message_html = utils.rewrite_html(
-                message["richestBody"]["content"], content_base_url,
+                message["richestBody"]["content"],
+                content_base_url,
                 make_static_url=self.static_url,
             )
 
@@ -262,8 +263,8 @@ class EMailHandler(BaseAPIHandler):
 class WebApplication(tornado.web.Application):
     def __init__(self, base_maildir, debug=False):
         handlers = [
-            (r"/", IndexHandler),
-            (r"/q", IndexHandler),
+            (r"/", QuickHandler),
+            (r"/q", QuickHandler),
             (r"/view", ViewHandler),
             (r"/api", PingHandler),
             (r"/api/([^/]+)", MailBoxHandler),
