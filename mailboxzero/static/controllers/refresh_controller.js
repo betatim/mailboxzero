@@ -1,6 +1,6 @@
 
 import * as Turbo from "@hotwired/turbo"
-import { Controller } from "stimulus"
+import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static values = { interval: Number, src: String }
