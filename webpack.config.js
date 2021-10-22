@@ -38,18 +38,13 @@ module.exports = {
           MiniCssExtractPlugin.loader,
           {
             // translates CSS into CommonJS modules
-            loader: "css-loader"
+            loader: "css-loader",
+            options: {
+              importLoaders: 1
+            }
           },
           {
-            // Run postcss actions
             loader: "postcss-loader",
-            options: {
-              postcssOptions: {
-                plugins: function() {
-                  return [require("autoprefixer")];
-                }
-              }
-            }
           },
           {
             // compiles Sass to CSS

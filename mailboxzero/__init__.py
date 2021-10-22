@@ -166,6 +166,7 @@ class ViewEMailHandler(BaseHandler):
 
         self.render(
             "email.html",
+            address=address,
             subject=message["subject"],
             raw_message_html=escaped_message,
             content_base_url=content_base_url,
