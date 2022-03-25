@@ -22,6 +22,7 @@
   {% if not email_ids%}
     <p>This inbox is empty.</p>
     <p class="text-muted">Click the email address to copy it to your clipboard.</p>
+    <p class="text-muted">Emails will be automatically deleted ten minutes after they arrive.</p>
     <p class="text-muted">Bookmark this page to find this inbox again later.</p>
   {% else %}
     {% for email_id in email_ids %}
